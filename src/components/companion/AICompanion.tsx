@@ -133,7 +133,7 @@ export function AICompanion() {
     : `${getProviderMeta(settings.provider).name} · ${getActiveModel(settings, 'chat')}`;
 
   return (
-    <div className="fixed bottom-7 right-7 z-50 flex flex-col items-end gap-4">
+    <div className="fixed bottom-4 right-4 md:bottom-7 md:right-7 z-50 flex flex-col items-end gap-4">
       {/* ── Chat Panel ── */}
       <AnimatePresence>
         {isOpen && (
@@ -142,7 +142,7 @@ export function AICompanion() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 380, damping: 26 }}
-            className="w-[380px] h-[520px] overflow-hidden rounded-2xl border border-stone-200/70 bg-white flex flex-col"
+            className="w-full h-full md:w-[380px] md:h-[520px] overflow-hidden md:rounded-2xl border border-stone-200/70 bg-white flex flex-col fixed inset-0 md:static"
             style={{ boxShadow: "0 8px 32px rgba(42, 37, 32, 0.10), 0 1px 3px rgba(42, 37, 32, 0.05)" }}
           >
             {/* Header */}

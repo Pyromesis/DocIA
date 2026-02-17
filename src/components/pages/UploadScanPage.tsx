@@ -605,12 +605,12 @@ export function UploadScanPage() {
   return (
     <div className="h-full flex flex-col max-w-[1800px] mx-auto">
       {/* Header */}
-      <div className="flex justify-between items-center shrink-0 mb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 shrink-0 mb-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 font-display">
+          <h1 className="text-xl md:text-2xl font-semibold text-gray-900 font-display">
             Document Scanner
           </h1>
-          <p className="text-gray-500 mt-0.5 text-sm">
+          <p className="text-gray-500 mt-0.5 text-xs md:text-sm">
             Sube documentos para extracción inteligente con IA
           </p>
         </div>
@@ -625,11 +625,11 @@ export function UploadScanPage() {
         )}
       </div>
 
-      {/* MAIN CONTENT: 3-column layout when template selected */}
-      <div className="flex-1 min-h-0 flex gap-3">
+      {/* MAIN CONTENT: 3-column layout when template selected, stacks on mobile */}
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-3 overflow-y-auto md:overflow-hidden">
 
         {/* LEFT PANEL: Document Preview / Upload */}
-        <div className="flex-1 flex flex-col bg-gray-50 border border-gray-200 rounded-xl overflow-hidden shadow-inner relative min-w-0">
+        <div className="min-h-[300px] md:min-h-0 md:flex-1 flex flex-col bg-gray-50 border border-gray-200 rounded-xl overflow-hidden shadow-inner relative min-w-0">
           <div className="bg-white/90 backdrop-blur-sm border-b border-gray-200 px-4 py-2.5 flex justify-between items-center shrink-0 z-10">
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Documento Original</span>
             {file && !result && (
@@ -674,7 +674,7 @@ export function UploadScanPage() {
         </div>
 
         {/* RIGHT PANEL: Configuration OR Results */}
-        <div className={`flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm ${result ? 'w-[480px]' : 'w-[380px]'} shrink-0`}>
+        <div className={`flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm w-full md:shrink-0 ${result ? 'md:w-[480px]' : 'md:w-[380px]'}`}>
           {!result ? (
             /* ═══ CONFIGURATION MODE ═══ */
             <div className="flex flex-col h-full">
