@@ -1,0 +1,46 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background: Soft Cream/White matching the brand -->
+  <rect width="512" height="512" rx="120" fill="#FDFCFA"/>
+  
+  <!-- Bear Body/Shoulders -->
+  <path d="M156 320C156 320 160 220 256 220C352 220 356 320 356 320V420H156V320Z" fill="#CBB08A"/>
+  
+  <!-- Bear Head -->
+  <circle cx="256" cy="230" r="110" fill="#B8925C"/>
+  <circle cx="256" cy="230" r="110" fill="url(#paint0_linear)"/>
+  
+  <!-- Ears -->
+  <circle cx="176" cy="150" r="35" fill="#A47E4E"/>
+  <circle cx="336" cy="150" r="35" fill="#A47E4E"/>
+  
+  <!-- Muzzle -->
+  <ellipse cx="256" cy="260" rx="45" ry="38" fill="#FDFCFA"/>
+  
+  <!-- Nose -->
+  <path d="M241 250H271C276.5 250 281 254.5 281 260C281 271 271 280 256 280C241 280 231 271 231 260C231 254.5 235.5 250 241 250Z" fill="#644A34"/>
+  <path d="M256 280V290" stroke="#644A34" stroke-width="4" stroke-linecap="round"/>
+  
+  <!-- Eyes -->
+  <circle cx="220" cy="220" r="8" fill="#4A3B2A"/>
+  <circle cx="292" cy="220" r="8" fill="#4A3B2A"/>
+  
+  <!-- The Document -->
+  <rect x="196" y="300" width="120" height="150" rx="8" fill="#E4DFDA" stroke="#FDFCFA" stroke-width="4"/>
+  
+  <!-- Document Content (Abstract Lines) -->
+  <path d="M226 330H286" stroke="#FDFCFA" stroke-width="6" stroke-linecap="round"/>
+  <path d="M226 355H286" stroke="#FDFCFA" stroke-width="6" stroke-linecap="round"/>
+  <path d="M226 380H266" stroke="#FDFCFA" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Paws holding the doc -->
+  <circle cx="196" cy="360" r="25" fill="#B8925C"/>
+  <circle cx="316" cy="360" r="25" fill="#B8925C"/>
+  
+  <!-- Gradients -->
+  <defs>
+    <linearGradient id="paint0_linear" x1="256" y1="120" x2="256" y2="340" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#CBB08A" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#A47E4E" stop-opacity="0.1"/>
+    </linearGradient>
+  </defs>
+</svg>

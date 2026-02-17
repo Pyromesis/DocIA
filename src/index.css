@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+@theme {
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* ─── Premium Stationery Palette ─── */
+
+  /* Warm Whites & Cloud Greys (Base) */
+  --color-cream-50: #FDFCFA;
+  --color-cream-100: #FAF8F5;
+  --color-cream-200: #F5F1EC;
+  --color-cream-300: #EDE8E0;
+
+  /* Warm Greys (Neutral) */
+  --color-stone-50: #F9F7F5;
+  --color-stone-100: #F0EDEA;
+  --color-stone-200: #E4DFDA;
+  --color-stone-300: #D1CBC3;
+  --color-stone-400: #B0A89E;
+  --color-stone-500: #8E857A;
+  --color-stone-600: #6E665C;
+  --color-stone-700: #544D45;
+  --color-stone-800: #3D3731;
+  --color-stone-900: #2A2520;
+  --color-stone-950: #1A1613;
+
+  /* Light Brown / Tan / Taupe (Primary Accent) */
+  --color-tan-50: #FBF6F0;
+  --color-tan-100: #F5EBDD;
+  --color-tan-200: #EBDAC2;
+  --color-tan-300: #DFC4A0;
+  --color-tan-400: #CCAA7A;
+  --color-tan-500: #B8925C;
+  --color-tan-600: #A47E4E;
+  --color-tan-700: #896843;
+  --color-tan-800: #6E5438;
+  --color-tan-900: #5A452E;
+
+  /* Coffee / Deep Brown (Secondary Accent) */
+  --color-coffee-50: #F7F3EF;
+  --color-coffee-100: #EDE5DC;
+  --color-coffee-200: #DBC9B4;
+  --color-coffee-300: #C5A88A;
+  --color-coffee-400: #AD8A66;
+  --color-coffee-500: #96714E;
+  --color-coffee-600: #7C5C3F;
+  --color-coffee-700: #644A34;
+  --color-coffee-800: #4E3A2A;
+  --color-coffee-900: #3A2B20;
+
+  /* Muted Sage (Success / Positive) */
+  --color-sage-50: #F4F7F4;
+  --color-sage-100: #E5ECE5;
+  --color-sage-200: #C8D8C8;
+  --color-sage-300: #A3BEA3;
+  --color-sage-400: #7DA07D;
+  --color-sage-500: #5F865F;
+  --color-sage-600: #4C6D4C;
+
+  /* Muted Rose (Warning / Alert) */
+  --color-rose-50: #FAF2F0;
+  --color-rose-100: #F2DDD8;
+  --color-rose-200: #E5BBB2;
+  --color-rose-300: #D49888;
+  --color-rose-400: #C27A66;
+  --color-rose-500: #A96250;
+}
+
+/* ─── Global Resets & Base ─── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-stone-300) transparent;
+}
+
+html {
+  background-color: var(--color-cream-50);
+}
+
+body {
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--color-stone-800);
+  background-color: var(--color-cream-50);
+}
+
+::selection {
+  background-color: var(--color-tan-200);
+  color: var(--color-stone-900);
+}
+
+/* Focus ring style */
+*:focus-visible {
+  outline: 2px solid var(--color-tan-400);
+  outline-offset: 2px;
+}
+
+/* ─── Global Polish ─── */
+/* Smooth rounded corners on all interactive elements */
+button, input, select, textarea {
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+/* Cards and panels get max roundness */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+/* Smooth scrollbar animation */
+* {
+  scroll-behavior: smooth;
+}
+
+/* ─── Keyframes ─── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.08); opacity: 0.3; }
+}
+
+@keyframes gentle-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.2; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ─── Utility Animations ─── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}

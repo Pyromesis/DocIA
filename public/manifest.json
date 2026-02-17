@@ -1,0 +1,15 @@
+{
+  "short_name": "DocIA",
+  "name": "DocIA - Document Intelligence",
+  "icons": [
+    {
+      "src": "docia-icon.jpg",
+      "type": "image/jpeg",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#FDFCFA",
+  "background_color": "#FDFCFA"
+}

@@ -1,0 +1,22 @@
+# Logic
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor folders
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# AI / System
+.gemini
+tsc_output.txt
+CHANGES_SUMMARY.md
+FINAL_STATUS.md
