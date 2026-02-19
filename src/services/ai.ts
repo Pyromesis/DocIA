@@ -94,11 +94,10 @@ export const PROVIDER_MODELS: Record<CloudProvider, ModelOption[]> = {
         { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", vision: true },
     ],
     groq: [
-        { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", free: true, recommended: true },
-        { id: "meta-llama/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B", free: true, vision: true, recommended: true },
-        { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B Instant" },
+        { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B (Fast)", free: true, recommended: true },
+        { id: "llama-3.2-11b-vision-preview", name: "Llama 3.2 11B Vision (Free)", free: true, vision: true, recommended: true },
+        { id: "deepseek-r1-distill-llama-70b", name: "DeepSeek R1 Distill (Reasoning)", free: true },
         { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B" },
-        { id: "gemma2-9b-it", name: "Gemma 2 9B" },
     ],
     openrouter: [
         // ── Free models (verified working on OpenRouter feb 2026) ──
@@ -189,11 +188,11 @@ export const PROVIDERS: ProviderMeta[] = [
     {
         id: "groq",
         name: "Groq",
-        description: "Ultra-fast inference — Llama 3.3, Mixtral, Vision",
+        description: "Llama 3.2 11B Vision & DeepSeek R1 — Fastest Inference",
         keyUrl: "https://console.groq.com/keys",
         keyHint: "gsk_...",
         chatModel: "llama-3.3-70b-versatile",
-        visionModel: "meta-llama/llama-4-scout-17b-16e-instruct",
+        visionModel: "llama-3.2-11b-vision-preview",
         supportsVision: true,
         color: "#f55036",
     },
@@ -761,18 +760,42 @@ export async function scanDocument(
         }
 
         if (targetVariables.length > 0) {
-            prompt += `\n\n## ⚠️ STRICT EXTRACTION MODE — MANDATORY ⚠️\n` +
-                `You MUST extract values ONLY for the following ${targetVariables.length} template variables.\n` +
-                `DO NOT add ANY extra fields. Return EXACTLY ${targetVariables.length} fields — no more, no less.\n\n` +
-                `TEMPLATE VARIABLES (extract ONLY these):\n` +
-                targetVariables.map(v => `- "${v}"`).join('\n') +
-                `\n\n### RULES:\n` +
-                `1. Each "label" in your response MUST be EXACTLY one of the variable names listed above (case-sensitive).\n` +
-                `2. Read the document CAREFULLY. Look for text that corresponds to each variable.\n` +
-                `3. If the value is HANDWRITTEN, zoom in mentally and read each character. Provide your best OCR reading.\n` +
-                `4. If you truly cannot find a value, return it with value "" and confidence 0.\n` +
-                `5. NEVER guess or invent values. Only return what is actually VISIBLE in the document.\n` +
-                `6. For dates, amounts, and IDs: read the EXACT characters written, do not reformat.`;
+            // DETECT CROP MODE: If we are looking for EXACTLY 1 variable and have NO learning cues,
+            // assume this is a cropped image containing JUST the value.
+            const isCropMode = targetVariables.length === 1 && learningCues.length === 0;
+
+            if (isCropMode) {
+                prompt += `\n\n## 🎯 SINGLE FIELD CROP MODE (High Precision)\n` +
+                    `The image is a targeted crop for field: "${targetVariables[0]}".\n` +
+                    `YOUR GOAL: Extract the VALUE associated with "${targetVariables[0]}".\n` +
+                    `RULES:\n` +
+                    `1. If the crop contains "Label: Value" (e.g., "Total: $500"), return ONLY "Value" ("$500").\n` +
+                    `2. If the crop contains ONLY the value (e.g., "$500"), return it exactly.\n` +
+                    `3. If the crop contains multiple lines, try to identify the main value. If it's a block of text (description), return all of it.\n` +
+                    `4. Ignore tiny noise or artifacts.\n` +
+                    `5. Return result as JSON with key "${targetVariables[0]}".`;
+            } else {
+                prompt += `\n\n## ⚠️ STRICT EXTRACTION MODE — MANDATORY ⚠️\n` +
+                    `You MUST extract values for the following ${targetVariables.length} template variables.\n` +
+                    `Return EXACTLY ${targetVariables.length} fields — no more, no less.\n\n` +
+                    `TEMPLATE VARIABLES (extract ONLY these):\n` +
+                    targetVariables.map(v => `- "${v}"`).join('\n') +
+                    `\n\n### CRITICAL SEMANTIC MAPPING RULES:\n` +
+                    `1. Each "label" in your response MUST be EXACTLY one of the variable names listed above — use the EXACT same string, case-sensitive.\n` +
+                    `2. USE SEMANTIC UNDERSTANDING to map document content to template variables. Examples:\n` +
+                    `   - If you see "Fecha: 18-feb.-2026" and the variable is "date" or "fecha", the value is "18-feb.-2026"\n` +
+                    `   - If you see "Total: $240,000" and the variable is "total_to_pay", the value is "$240,000"\n` +
+                    `   - If you see "N° Orden: 245,278" and the variable is "order_number", the value is "245,278"\n` +
+                    `   - If you see "Creada Por: ETAMIA CHACON" and the variable is "jobs_done" or "created_by", map accordingly\n` +
+                    `3. Read the document VERY CAREFULLY. Scan EVERY part of the image — headers, tables, footer, handwritten areas, stamps.\n` +
+                    `4. If the value is HANDWRITTEN, zoom in mentally and read each character. Provide your best OCR reading.\n` +
+                    `5. If you truly cannot find a value for a variable, return it with value "" and confidence 0.\n` +
+                    `6. For dates: read EXACT text as written (e.g. "9-feb.-2026", "18/02/2026").\n` +
+                    `7. For amounts: read EXACT text including currency symbol and separators (e.g. "$ 240,000.00").\n` +
+                    `8. For reference numbers: read character by character (e.g. "245,278", "COT-2024-001").\n` +
+                    `9. DO NOT return empty values if you can see ANY relevant text in the document. Try harder.\n` +
+                    `10. Variable names may be in English but the document may be in Spanish (or vice versa) — use your intelligence to match semantically.`;
+            }
         }
 
         if (learningCues.length > 0) {
@@ -919,6 +942,7 @@ async function scanOpenAICompat(
                 },
             ],
             max_tokens: 8192,
+            temperature: 0.1,
             response_format: { type: "json_object" },
         }),
     });
@@ -1021,12 +1045,16 @@ async function scanWithGemini(
                             {
                                 text:
                                     prompt +
-                                    "\n\nIMPORTANT: Return ONLY valid JSON, no markdown check.",
+                                    "\n\nIMPORTANT: Return ONLY valid JSON, no markdown, no explanations.",
                             },
                             { inline_data: { mime_type: mimeType, data: base64 } },
                         ],
                     },
                 ],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    temperature: 0.1,
+                },
             }),
         }
     );
@@ -1040,7 +1068,13 @@ async function scanWithGemini(
         .replace(/```json\n?/g, "")
         .replace(/```\n?/g, "")
         .trim();
-    return JSON.parse(clean);
+    try {
+        return JSON.parse(clean);
+    } catch {
+        const jsonMatch = clean.match(/\{[\s\S]*\}/);
+        if (jsonMatch) return JSON.parse(jsonMatch[0]);
+        throw new Error("Gemini did not return valid JSON. Response: " + clean.slice(0, 200));
+    }
 }
 
 async function scanWithAnthropic(
@@ -1066,6 +1100,7 @@ async function scanWithAnthropic(
         body: JSON.stringify({
             model,
             max_tokens: 4096,
+            temperature: 0.1,
             messages: [
                 {
                     role: "user",

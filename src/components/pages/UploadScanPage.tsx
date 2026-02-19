@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings2, Play, CheckCircle2, UploadCloud, Loader2, Copy, Download, RotateCcw, FileText, FileType, Brain, FolderPlus, Palette, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { Settings2, Play, CheckCircle2, UploadCloud, Loader2, Copy, Download, RotateCcw, FileText, FileType, Brain, FolderPlus, Palette, ChevronDown, ChevronUp, Eye, CheckSquare, Square } from 'lucide-react';
 import { db } from '../../db/schema';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useDropzone } from 'react-dropzone';
@@ -71,6 +71,7 @@ export function UploadScanPage() {
   const [scanStage, setScanStage] = useState('');
   const [result, setResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [savedDocumentId, setSavedDocumentId] = useState<number | null>(null);
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | string>('none');
   const [outputName, setOutputName] = useState('');
@@ -87,11 +88,14 @@ export function UploadScanPage() {
   const [isRefining, setIsRefining] = useState(false);
   const lastProcessedAnns = useRef<string>('');
 
+  // Track which fields the user has manually edited — never overwrite these with AI
+  const userEditedFields = useRef<Set<string>>(new Set());
+
   // ─── Automatic Semantic Refinement ───
   useEffect(() => {
     const labeledAnnotations = annotations.filter(a => a.label);
     // Create a signature of the semantic annotations (ID + positions) to detect meaningful changes
-    const signature = JSON.stringify(labeledAnnotations.map(a => ({ id: a.id, pts: a.points })));
+    const signature = JSON.stringify(labeledAnnotations.map(a => ({ id: a.id, pts: a.points, type: a.type, x: a.x, y: a.y, w: a.w, h: a.h })));
 
     if (!file || !result || labeledAnnotations.length === 0) return;
     if (signature === lastProcessedAnns.current) return;
@@ -100,10 +104,21 @@ export function UploadScanPage() {
     const timer = setTimeout(() => {
       lastProcessedAnns.current = signature;
       handleSmartRefineCrop(labeledAnnotations);
+      // Auto-enable training for annotated fields
+      setTrainingSelection(prev => {
+        const next = { ...prev };
+        labeledAnnotations.forEach(a => {
+          if (a.label) next[a.label] = true;
+        });
+        return next;
+      });
     }, 1500); // 1.5s delay to let user finish drawing
 
     return () => clearTimeout(timer);
   }, [annotations, file, result]);
+
+  const [recentlyUpdatedFields, setRecentlyUpdatedFields] = useState<Set<string>>(new Set());
+  const [loadingField, setLoadingField] = useState<string | null>(null);
 
   /* 🧠 Smart Refinement: Uses "Cropping Strategy" to force AI focus */
   const handleSmartRefineCrop = async (hints: Annotation[]) => {
@@ -115,10 +130,20 @@ export function UploadScanPage() {
       const settings = await loadAISettings();
       const newFields = [...(result.fields || [])];
       let updatedCount = 0;
+      const updatedLabels = new Set<string>();
+
+      console.log('🧠 Smart Refinement Started with hints:', hints);
+      console.log('🖼️ Image Source:', imageSrc ? 'Present' : 'Missing');
 
       // Process each hint in parallel
       await Promise.all(hints.map(async (ann) => {
         if (!ann.label) return;
+
+        // SKIP fields that the user has manually edited — respect user corrections
+        if (userEditedFields.current.has(ann.label)) {
+          console.log(`⏭️ Skipping AI refinement for user-edited field: ${ann.label}`);
+          return;
+        }
 
         // 1. Calculate Crop Rect (Natural Pixels from Annotation)
         let minX = 0, minY = 0, w = 0, h = 0;
@@ -133,21 +158,30 @@ export function UploadScanPage() {
           minX = ann.x; minY = ann.y || 0; w = ann.w || 0; h = ann.h || 0;
         }
 
-        // Add padding (10%) to context for better OCR
-        const padX = w * 0.1;
-        const padY = h * 0.1;
+        // Add generous padding (25%) or at least 20px for better OCR context
+        const padX = Math.max(w * 0.25, 20);
+        const padY = Math.max(h * 0.25, 20);
 
         const startX = Math.max(0, minX - padX);
         const startY = Math.max(0, minY - padY);
         const cropW = Math.min(img.naturalWidth - startX, w + padX * 2);
         const cropH = Math.min(img.naturalHeight - startY, h + padY * 2);
 
-        if (cropW <= 0 || cropH <= 0) return;
+        if (cropW <= 0 || cropH <= 0) {
+          console.warn('⚠️ Invalid crop dimensions:', { cropW, cropH });
+          return;
+        }
 
-        // 2. Crop Image
+        // 2. Crop Image — use higher resolution for better OCR
         const cropBase64 = cropImage(img, { x: startX, y: startY, w: cropW, h: cropH });
 
-        // 3. Scan ONLY this snippet
+        if (!cropBase64 || cropBase64.length < 100) {
+          console.warn('⚠️ Crop yielded empty image for:', ann.label);
+          return;
+        }
+
+        // 3. Scan ONLY this snippet with an enhanced focused prompt
+        setLoadingField(ann.label); // ⏳ PRO FEEDBACK
         console.log(`✂️ Scanning crop for variable: ${ann.label}`);
         const cropResult = await scanDocument(
           cropBase64,
@@ -157,16 +191,22 @@ export function UploadScanPage() {
           [],
           { strictMode: true }
         );
+        setLoadingField(null);
 
-        // 4. Update Field in Result
-        const extractedValue = cropResult.fields?.find(f => f.label === ann.label)?.value;
-        if (extractedValue && extractedValue !== '(Vacio)') {
-          const existingIdx = newFields.findIndex(f => f.label === ann.label);
+        // 4. Update Field in Result — only if AI found a non-empty value
+        const annLabel = ann.label!;
+        const extractedField = cropResult.fields?.find(f =>
+          f.label.toLowerCase() === annLabel.toLowerCase()
+        );
+        const extractedValue = extractedField?.value;
+        if (extractedValue && extractedValue.trim() !== '' && extractedValue !== '(Vacio)') {
+          const existingIdx = newFields.findIndex(f => f.label === annLabel);
           if (existingIdx !== -1) {
-            newFields[existingIdx] = { ...newFields[existingIdx], value: extractedValue, confidence: 0.99 };
+            newFields[existingIdx] = { ...newFields[existingIdx], value: extractedValue.trim(), confidence: 0.95 };
           } else {
-            newFields.push({ label: ann.label, value: extractedValue, confidence: 0.99 });
+            newFields.push({ label: annLabel, value: extractedValue.trim(), confidence: 0.95 });
           }
+          updatedLabels.add(annLabel);
           updatedCount++;
         }
       }));
@@ -174,6 +214,9 @@ export function UploadScanPage() {
       if (updatedCount > 0) {
         console.log(`🧠 Smart Refine: Updated ${updatedCount} fields via cropping`);
         setResult({ ...result, fields: newFields });
+        setRecentlyUpdatedFields(updatedLabels);
+        // Clear highlight after 3 seconds
+        setTimeout(() => setRecentlyUpdatedFields(new Set()), 3000);
       }
 
     } catch (e) {
@@ -279,19 +322,91 @@ export function UploadScanPage() {
     }
   }, [selectedTemplateId, templates]);
 
+  // ─── Debounced auto-save when user edits fields ───
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Serialize fields to a stable key to avoid render loops
+  const fieldsKey = result ? JSON.stringify(result.fields.map(f => `${f.label}:${f.value}`)) : '';
+  useEffect(() => {
+    if (!result || !savedDocumentId) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await db.documents.update(savedDocumentId, {
+          metadata: {
+            fields: result.fields,
+            summary: result.summary,
+          },
+          updatedAt: Date.now(),
+        });
+        console.log('📝 Auto-saved edited fields to document', savedDocumentId);
+      } catch (e) {
+        console.error('Auto-save failed:', e);
+      }
+    }, 2000);
+    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldsKey, savedDocumentId]);
+
   const handleSaveAndTrain = async () => {
     if (!result || !file) return;
     setIsTraining(true);
     try {
       const trainingFields = result.fields.filter(f => trainingSelection[f.label]);
+
+      // Calculate Normalized Locations (0-100%) for annotated fields
+      const fieldLocations: Record<string, { x: number; y: number; w: number; h: number }> = {};
+
+      if (imgDim.w > 0 && imgDim.h > 0) {
+        annotations.forEach(ann => {
+          if (ann.label && trainingSelection[ann.label]) {
+            // Find bounds of the annotation
+            let minX = 0, minY = 0, w = 0, h = 0;
+            if (ann.points && ann.points.length > 0) {
+              const xs = ann.points.map(p => p.x);
+              const ys = ann.points.map(p => p.y);
+              minX = Math.min(...xs);
+              minY = Math.min(...ys);
+              w = Math.max(...xs) - minX;
+              h = Math.max(...ys) - minY;
+            } else if (ann.x !== undefined) {
+              minX = ann.x; minY = ann.y || 0; w = ann.w || 0; h = ann.h || 0;
+            }
+
+            // Convert to percentage
+            fieldLocations[ann.label] = {
+              x: (minX / imgDim.w) * 100,
+              y: (minY / imgDim.h) * 100,
+              w: (w / imgDim.w) * 100,
+              h: (h / imgDim.h) * 100
+            };
+          }
+        });
+      }
+
       const { saveMemoriesFromScan } = await import('../../services/aiMemory');
       await saveMemoriesFromScan({
-        documentName: outputName,
+        documentName: outputName || file.name,
         documentType: file.type,
         fields: trainingFields,
         summary: result.summary,
-        rawText: result.rawText
+        rawText: result.rawText,
+        fieldLocations, // Save spatial data!
+        templateId: selectedTemplateId !== 'none' ? Number(selectedTemplateId) : undefined
       });
+
+      // Also update the document in DB with the (possibly edited) fields
+      if (savedDocumentId) {
+        await db.documents.update(savedDocumentId, {
+          name: outputName || file.name,
+          templateId: selectedTemplateId && selectedTemplateId !== 'none' ? Number(selectedTemplateId) : undefined,
+          metadata: {
+            fields: result.fields,
+            summary: result.summary,
+          },
+          updatedAt: Date.now(),
+        });
+        console.log('✅ Document updated in DB with edited fields');
+      }
 
       const btn = document.getElementById('train-btn');
       if (btn) {
@@ -371,11 +486,50 @@ export function UploadScanPage() {
 
       // Get target variables from selected template (parsed from HTML content)
       let targetVariables: string[] = getTemplateVariables();
-      if (targetVariables.length > 0) {
-        setScanStage(`Extrayendo ${targetVariables.length} campos de plantilla...`);
+      // 🧠 LOAD LEARNING CUES (SPATIAL MEMORY)
+      setScanStage('Consultando memoria espacial...');
+      const { searchMemories } = await import('../../services/aiMemory');
+
+      // Find memories that match this document (by name OR TEMPLATE ID)
+      const matches = await searchMemories(
+        outputName || file.name,
+        selectedTemplateId !== 'none' ? Number(selectedTemplateId) : undefined
+      );
+
+      console.log('🧠 Memory Matches found:', matches);
+
+      const bestPattern = matches.find(m => m.entry.type === 'document_pattern');
+
+      let learningCues: { variable: string; x: number; y: number; w: number; h: number }[] = [];
+      if (bestPattern) {
+        try {
+          console.log('🧠 Loading cues from pattern:', bestPattern.entry.title);
+          const data = JSON.parse(bestPattern.entry.content);
+          if (data.locations) {
+            // Convert location map to array
+            learningCues = Object.entries(data.locations).map(([lbl, loc]: any) => ({
+              variable: lbl,
+              x: loc.x, y: loc.y, w: loc.w, h: loc.h
+            }));
+            console.log('Using spatial learning cues:', learningCues);
+          }
+        } catch (e) { console.error('Error parsing spatial cues', e); }
       }
 
-      const scanResult = await scanDocument(base64, mimeType, settings, targetVariables, [], { strictMode: !!selectedTemplateId && selectedTemplateId !== 'none' });
+
+
+      if (targetVariables.length > 0) {
+        setScanStage(`Extrayendo ${targetVariables.length} campos...`);
+      }
+
+      const scanResult = await scanDocument(
+        base64,
+        mimeType,
+        settings,
+        targetVariables,
+        learningCues,
+        { strictMode: !!selectedTemplateId && selectedTemplateId !== 'none' }
+      );
 
       setScanStage('Procesando resultados...');
       setScanProgress(80);
@@ -384,7 +538,7 @@ export function UploadScanPage() {
 
       // Save to database
       const now = Date.now();
-      await db.documents.add({
+      const docId = await db.documents.add({
         name: outputName || file.name,
         type: file.type.split('/')[1] || 'unknown',
         size: file.size,
@@ -400,6 +554,7 @@ export function UploadScanPage() {
         createdAt: now,
         updatedAt: now,
       });
+      setSavedDocumentId(docId as number);
 
       await db.activityLogs.add({
         action: 'process',
@@ -437,10 +592,15 @@ export function UploadScanPage() {
     URL.revokeObjectURL(url);
   };
 
-  const getMergedContent = (): { html: string; css: string } => {
-    if (!result) return { html: '', css: '' };
+  /** Normalize a string for variable matching: strip accents, lowercase, snake_case */
+  const normalizeVar = (s: string): string =>
+    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '');
+
+  const getMergedContent = (): { html: string; css: string; isFullDocument: boolean } => {
+    if (!result) return { html: '', css: '', isFullDocument: false };
     let html = '';
     let css = '';
+    let isFullDocument = false;
 
     // If a template was used, try to use its HTML structure
     if (selectedTemplateId && selectedTemplateId !== 'none') {
@@ -448,34 +608,41 @@ export function UploadScanPage() {
       if (tpl && tpl.schema && tpl.schema.htmlContent) {
         let raw = tpl.schema.htmlContent as string;
 
-        // Extract <style> blocks from template HTML
-        const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-        let styleMatch;
-        while ((styleMatch = styleRegex.exec(raw)) !== null) {
-          css += styleMatch[1] + '\n';
-        }
-        // Remove <style> from body content
-        html = raw.replace(styleRegex, '');
-
-        // Replace variables: {{label}} -> value (try multiple formats)
+        // Build a normalized mapping: normalizedLabel -> value
+        const fieldMap = new Map<string, string>();
         result.fields.forEach(f => {
-          // Original label
-          const re1 = new RegExp(`\\{\\{\\s*${f.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\}\\}`, 'gi');
-          html = html.replace(re1, f.value || '');
-
-          // lower_snake_case
-          const snakeKey = f.label.toLowerCase().replace(/\s+/g, '_');
-          const re2 = new RegExp(`\\{\\{\\s*${snakeKey}\\s*\\}\\}`, 'gi');
-          html = html.replace(re2, f.value || '');
-
-          // UPPER_SNAKE_CASE
-          const upperKey = f.label.toUpperCase().replace(/\s+/g, '_');
-          const re3 = new RegExp(`\\{\\{\\s*${upperKey}\\s*\\}\\}`, 'gi');
-          html = html.replace(re3, f.value || '');
+          const val = f.value || '';
+          fieldMap.set(normalizeVar(f.label), val);
+          fieldMap.set(f.label.toLowerCase(), val);
+          fieldMap.set(f.label, val);
         });
 
-        // Clean up any remaining {{variable}} placeholders
-        html = html.replace(/\{\{[^}]+\}\}/g, '___');
+        // Replace ALL {{variable}} placeholders in the template
+        raw = raw.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_match, varName: string) => {
+          if (fieldMap.has(varName)) return fieldMap.get(varName)!;
+          if (fieldMap.has(varName.toLowerCase())) return fieldMap.get(varName.toLowerCase())!;
+          const norm = normalizeVar(varName);
+          if (fieldMap.has(norm)) return fieldMap.get(norm)!;
+          for (const [key, val] of fieldMap.entries()) {
+            if (normalizeVar(key) === norm) return val;
+          }
+          return '___';
+        });
+
+        // Check if the template HTML is already a complete document
+        if (raw.includes('<html') || raw.includes('<!DOCTYPE') || raw.includes('<HTML')) {
+          // Full document — use as-is
+          html = raw;
+          isFullDocument = true;
+        } else {
+          // Partial HTML — extract styles and return body content
+          const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+          let styleMatch;
+          while ((styleMatch = styleRegex.exec(raw)) !== null) {
+            css += styleMatch[1] + '\n';
+          }
+          html = raw.replace(styleRegex, '');
+        }
       }
     }
 
@@ -512,13 +679,42 @@ export function UploadScanPage() {
       `;
     }
 
-    return { html, css };
+    return { html, css, isFullDocument };
   };
+
+  /** CSS reset that removes browser defaults so template inline styles take priority */
+  const TEMPLATE_CSS_RESET = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    p, div, span, h1, h2, h3, h4, h5, h6 { margin: 0; padding: 0; line-height: inherit; }
+    body { margin: 0; padding: 0; color: #000; }
+    table { border-collapse: collapse; }
+  `;
 
   const handleDownloadWord = () => {
     if (!result) return;
-    const { html, css } = getMergedContent();
-    const fullDoc = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    const { html, css, isFullDocument } = getMergedContent();
+    const hasTemplate = selectedTemplateId && selectedTemplateId !== 'none';
+
+    let fullDoc: string;
+    if (isFullDocument) {
+      fullDoc = html
+        .replace(/<html/i, "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'");
+    } else if (hasTemplate) {
+      // Template fragment — use CSS reset so inline styles from template are the ONLY styles
+      fullDoc = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <meta charset='utf-8'>
+        <title>${outputName || file?.name || 'Documento'}</title>
+        <style>
+          @page { margin: 1in; size: letter; }
+          ${TEMPLATE_CSS_RESET}
+          ${css}
+        </style>
+      </head>
+      <body>${html}</body>
+    </html>`;
+    } else {
+      fullDoc = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
       <head>
         <meta charset='utf-8'>
         <title>${outputName || file?.name || 'Documento'}</title>
@@ -533,6 +729,7 @@ export function UploadScanPage() {
       </head>
       <body>${html}</body>
     </html>`;
+    }
 
     const blob = new Blob(['\ufeff', fullDoc], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
@@ -545,30 +742,77 @@ export function UploadScanPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!result) return;
-    const { html, css } = getMergedContent();
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`<!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <title>${outputName || file?.name || 'Documento'}</title>
-            <style>
-              @page { margin: 0.75in; size: letter; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12pt; line-height: 1.5; color: #000; margin: 0; padding: 0; }
-              table { width: 100%; border-collapse: collapse; }
-              th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-              * { box-sizing: border-box; }
-              img { max-width: 100%; }
-              ${css}
-            </style>
-          </head>
-          <body>${html}</body>
-        </html>`);
-      printWindow.document.close();
-      setTimeout(() => printWindow.print(), 500);
+    const { html, css, isFullDocument } = getMergedContent();
+    const hasTemplate = selectedTemplateId && selectedTemplateId !== 'none';
+
+    // Build the full HTML page for the PDF
+    let pdfHTML: string;
+    if (isFullDocument) {
+      pdfHTML = html;
+    } else if (hasTemplate) {
+      pdfHTML = `<!DOCTYPE html><html><head><meta charset="utf-8">
+        <style>${TEMPLATE_CSS_RESET} ${css}</style>
+      </head><body>${html}</body></html>`;
+    } else {
+      pdfHTML = `<!DOCTYPE html><html><head><meta charset="utf-8">
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12pt; line-height: 1.5; color: #000; margin: 0; padding: 0; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+          * { box-sizing: border-box; }
+          ${css}
+        </style>
+      </head><body>${html}</body></html>`;
+    }
+
+    // Create a visible iframe to render the content (html2canvas needs visible elements)
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '0';
+    iframe.style.top = '0';
+    iframe.style.width = '8.5in';
+    iframe.style.height = '11in';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.style.zIndex = '-9999';
+    document.body.appendChild(iframe);
+
+    try {
+      // Write HTML into the iframe
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDoc) throw new Error('Could not access iframe document');
+      iframeDoc.open();
+      iframeDoc.write(pdfHTML);
+      iframeDoc.close();
+
+      // Wait for content to render
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const contentEl = iframeDoc.body;
+      if (!contentEl || !contentEl.innerHTML.trim()) throw new Error('No content to render');
+
+      const html2pdf = (await import('html2pdf.js')).default;
+      await html2pdf().set({
+        margin: [0.5, 0.6, 0.5, 0.6],
+        filename: `${outputName || file?.name || 'document'}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      } as any).from(contentEl).save();
+    } catch (e) {
+      console.error('PDF generation failed, falling back to print:', e);
+      // Fallback: open print dialog with correct formatting
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(pdfHTML);
+        printWindow.document.close();
+        setTimeout(() => printWindow.print(), 500);
+      }
+    } finally {
+      document.body.removeChild(iframe);
     }
   };
 
@@ -577,12 +821,16 @@ export function UploadScanPage() {
     setImageSrc(null);
     setResult(null);
     setError(null);
+    setIsScanning(false);
     setScanProgress(0);
     setScanStage('');
-    setAnnotations([]);
     setOutputName('');
-    setVariableColorMap({});
+    setAnnotations([]);
     setActiveColorVariable(null);
+    setVariableColorMap({});
+    setSavedDocumentId(null);
+    lastProcessedAnns.current = '';
+    userEditedFields.current.clear();
   };
 
   // ─── Color-Variable Mapping Functions ───
@@ -904,8 +1152,10 @@ export function UploadScanPage() {
                       const colorInfo = variableColorMap[field.label]
                         ? VARIABLE_COLORS.find(c => c.hex === variableColorMap[field.label])
                         : null;
+                      const isUpdated = recentlyUpdatedFields.has(field.label);
+
                       return (
-                        <div key={field.label || idx} className="p-2.5 hover:bg-gray-50 transition-colors group">
+                        <div key={field.label} className={`p-2.5 transition-colors group relative ${isUpdated ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
                           <div className="flex items-center justify-between mb-1">
                             <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                               {colorInfo && (
@@ -916,23 +1166,52 @@ export function UploadScanPage() {
                               )}
                               <span>{field.label}</span>
                             </label>
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${field.confidence > 0.8 ? 'bg-emerald-100 text-emerald-700' :
-                              field.confidence > 0.5 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
-                              }`}>
-                              {Math.round(field.confidence * 100)}%
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {/* Confidence Badge */}
+                              {loadingField === field.label ? (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-blue-50 text-blue-600 flex items-center gap-1">
+                                  <Loader2 size={10} className="animate-spin" />
+                                  Analizando...
+                                </span>
+                              ) : (
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${field.confidence > 0.8 ? 'bg-emerald-100 text-emerald-700' :
+                                  field.confidence > 0.5 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                                  }`}>
+                                  {Math.round(field.confidence * 100)}%
+                                </span>
+                              )}
+
+                              {/* Training Checkbox */}
+                              <button
+                                onClick={() => setTrainingSelection(prev => ({ ...prev, [field.label]: !prev[field.label] }))}
+                                className={`transition-colors ${trainingSelection[field.label] ? 'text-emerald-500 hover:text-emerald-600' : 'text-gray-300 hover:text-gray-400'}`}
+                                title={trainingSelection[field.label] ? "Se usará para entrenar" : "No se usará para entrenar"}
+                              >
+                                {trainingSelection[field.label] ? <CheckSquare size={14} /> : <Square size={14} />}
+                              </button>
+                            </div>
                           </div>
-                          <input
-                            type="text"
+
+                          {/* Multiline Textarea */}
+                          <textarea
+                            key={`input-${field.label}`}
+                            rows={field.value.length > 50 ? 3 : 1}
                             value={field.value}
                             onChange={(e) => {
+                              // Direct mutation for performance, then state update
+                              const newVal = e.target.value;
                               if (!result) return;
-                              const newFields = [...result.fields];
-                              newFields[idx] = { ...field, value: e.target.value, confidence: 1 };
-                              setResult({ ...result, fields: newFields });
+
+                              // Create new array but keep object reference if possible to avoid full re-render of list? No, must start immutable.
+                              const newFields = result.fields.map((f, i) =>
+                                i === idx ? { ...f, value: newVal, confidence: 1 } : f
+                              );
+                              setResult(prev => prev ? ({ ...prev, fields: newFields }) : null);
+                              userEditedFields.current.add(field.label);
                             }}
-                            className="w-full text-sm font-medium text-gray-900 bg-transparent border-0 border-b border-dashed border-gray-200 hover:border-gray-300 focus:border-[#B8925C] focus:ring-0 px-0 py-1 transition-all"
+                            className="w-full text-sm font-medium text-gray-900 bg-transparent border-0 border-b border-dashed border-gray-200 hover:border-gray-300 focus:border-[#B8925C] focus:ring-0 px-0 py-1 transition-all resize-none"
                             placeholder="(Vacío)"
+                            style={{ minHeight: '28px', lineHeight: '1.4' }}
                           />
                         </div>
                       );
@@ -950,8 +1229,8 @@ export function UploadScanPage() {
                       {isTraining ? <Loader2 size={14} className="animate-spin" /> : <Brain size={14} />}
                       Confirmar y Entrenar IA
                     </button>
-                    <p className="text-[9px] text-gray-400 mt-1.5 text-center">
-                      Los campos se guardarán en la memoria IA para mejorar futuras extracciones.
+                    <p className="text-[9px] text-gray-400 mt-1.5 text-center px-4 leading-relaxed">
+                      Al confirmar, la IA aprenderá las <strong className="text-gray-500">ubicaciones</strong> de los campos marcados para mejorar futuras extracciones en documentos similares.
                     </p>
                   </div>
                 </div>

@@ -90,7 +90,7 @@ export async function saveMemory(params: {
 
 /**
  * Save memories from a completed document scan.
- * Extracts and stores document patterns and field schemas.
+ * Extracts and stores document patterns, field schemas, and SPATIAL LEARNING CUES.
  */
 export async function saveMemoriesFromScan(params: {
     documentName: string;
@@ -98,25 +98,34 @@ export async function saveMemoriesFromScan(params: {
     fields: { label: string; value: string; confidence: number }[];
     summary: string;
     rawText?: string;
+    fieldLocations?: Record<string, { x: number; y: number; w: number; h: number }>;
+    templateId?: number;
 }): Promise<void> {
     // 1. Save the document pattern
     const fieldLabels = params.fields.map(f => f.label.toLowerCase());
     const docCategory = categorizeDocument(fieldLabels, params.summary);
 
+    const tags = [...fieldLabels, docCategory, params.documentType];
+    if (params.templateId) tags.push(`template_${params.templateId}`);
+
     await saveMemory({
         type: 'document_pattern',
         category: docCategory,
-        title: `${docCategory} — ${params.documentName}`,
+        title: params.templateId
+            ? `Template #${params.templateId} Pattern` // Stable title for templates
+            : `${docCategory} — ${params.documentName}`,
         content: JSON.stringify({
             documentType: params.documentType,
+            templateId: params.templateId,
             structure: params.fields.map(f => ({
                 label: f.label,
                 sampleValue: f.value.slice(0, 100),
                 confidence: f.confidence,
             })),
+            locations: params.fieldLocations, // Persist spatial cues
             summary: params.summary,
         }),
-        tags: [...fieldLabels, docCategory, params.documentType],
+        tags: tags,
         sourceDocumentName: params.documentName,
     });
 
@@ -185,14 +194,22 @@ export async function loadMemoryContext(): Promise<MemoryContext> {
 
 /**
  * Search memories by tags, category, or free text.
+ * @param templateId - (Optional) Boost results that match this template ID
  */
-export async function searchMemories(query: string): Promise<MemorySearchResult[]> {
+export async function searchMemories(query: string, templateId?: number): Promise<MemorySearchResult[]> {
     const all = await db.aiMemory.toArray();
     const queryLower = query.toLowerCase();
     const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+    const templateTag = templateId ? `template_${templateId}` : null;
 
     const results: MemorySearchResult[] = all.map(entry => {
         let relevance = 0;
+
+        // 🚀 CRITICAL BOOST: Template Priority
+        // If this memory belongs to the same template, it's virtually a perfect match.
+        if (templateTag && entry.tags.includes(templateTag)) {
+            relevance += 10.0; // Massive boost
+        }
 
         // Tag matching (highest weight)
         const matchingTags = entry.tags.filter(t =>

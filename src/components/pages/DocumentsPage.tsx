@@ -36,38 +36,67 @@ export function DocumentsPage() {
         }
     };
 
+    /** Normalize a string for variable matching: strip accents, lowercase, snake_case */
+    const normalizeVar = (s: string): string =>
+        s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '');
+
+    /** Replace {{variables}} in template HTML using normalized matching */
+    const replaceTemplateVars = (raw: string, fields: { label: string; value: string }[]): string => {
+        const fieldMap = new Map<string, string>();
+        fields.forEach(f => {
+            const val = f.value || '';
+            fieldMap.set(normalizeVar(f.label), val);
+            fieldMap.set(f.label.toLowerCase(), val);
+            fieldMap.set(f.label, val);
+        });
+        return raw.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_match, varName: string) => {
+            if (fieldMap.has(varName)) return fieldMap.get(varName)!;
+            if (fieldMap.has(varName.toLowerCase())) return fieldMap.get(varName.toLowerCase())!;
+            const norm = normalizeVar(varName);
+            if (fieldMap.has(norm)) return fieldMap.get(norm)!;
+            for (const [key, val] of fieldMap.entries()) {
+                if (normalizeVar(key) === norm) return val;
+            }
+            return '___';
+        });
+    };
+
+    /** CSS reset that removes browser defaults so template inline styles take priority */
+    const TEMPLATE_CSS_RESET = `
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      p, div, span, h1, h2, h3, h4, h5, h6 { margin: 0; padding: 0; line-height: inherit; }
+      body { margin: 0; padding: 0; color: #000; }
+      table { border-collapse: collapse; }
+    `;
+
     const handleExportWord = async (doc: any) => {
         let htmlBody = '';
         let css = '';
+        let isFullDocument = false;
+        let hasTemplate = false;
 
-        // Try to use the document's template for faithful reproduction
         if (doc.templateId) {
             const tpl = await db.templates.get(doc.templateId);
             if (tpl?.schema?.htmlContent) {
+                hasTemplate = true;
                 let raw = tpl.schema.htmlContent as string;
-
-                // Extract <style> blocks
-                const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-                let styleMatch;
-                while ((styleMatch = styleRegex.exec(raw)) !== null) {
-                    css += styleMatch[1] + '\n';
-                }
-                htmlBody = raw.replace(styleRegex, '');
-
-                // Replace {{variable}} -> value
                 if (doc.metadata?.fields) {
-                    doc.metadata.fields.forEach((f: any) => {
-                        const escaped = f.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        htmlBody = htmlBody.replace(new RegExp(`\\{\\{\\s*${escaped}\\s*\\}\\}`, 'gi'), f.value || '');
-                        const snake = f.label.toLowerCase().replace(/\s+/g, '_');
-                        htmlBody = htmlBody.replace(new RegExp(`\\{\\{\\s*${snake}\\s*\\}\\}`, 'gi'), f.value || '');
-                    });
-                    htmlBody = htmlBody.replace(/\{\{[^}]+\}\}/g, '___');
+                    raw = replaceTemplateVars(raw, doc.metadata.fields);
+                }
+                if (raw.includes('<html') || raw.includes('<!DOCTYPE') || raw.includes('<HTML')) {
+                    htmlBody = raw;
+                    isFullDocument = true;
+                } else {
+                    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+                    let styleMatch;
+                    while ((styleMatch = styleRegex.exec(raw)) !== null) {
+                        css += styleMatch[1] + '\n';
+                    }
+                    htmlBody = raw.replace(styleRegex, '');
                 }
             }
         }
 
-        // Fallback: generate structured HTML from fields
         if (!htmlBody) {
             htmlBody = `<h1 style="font-size:22px; margin-bottom:16px; color:#1a1a1a; border-bottom:2px solid #B8925C; padding-bottom:8px;">${doc.name}</h1>`;
             if (doc.metadata?.summary) {
@@ -86,7 +115,21 @@ export function DocumentsPage() {
             }
         }
 
-        const fullDoc = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        let fullDoc: string;
+        if (isFullDocument) {
+            fullDoc = htmlBody.replace(/<html/i, "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'");
+        } else if (hasTemplate) {
+            // Template fragment — use CSS reset so inline styles are the ONLY styles
+            fullDoc = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head><meta charset='utf-8'><title>${doc.name}</title>
+            <style>
+                @page { margin: 1in; size: letter; }
+                ${TEMPLATE_CSS_RESET}
+                ${css}
+            </style>
+            </head><body>${htmlBody}</body></html>`;
+        } else {
+            fullDoc = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
             <head><meta charset='utf-8'><title>${doc.name}</title>
             <style>
                 @page { margin: 1in; size: letter; }
@@ -96,6 +139,7 @@ export function DocumentsPage() {
                 ${css}
             </style>
             </head><body>${htmlBody}</body></html>`;
+        }
 
         const blob = new Blob(['\ufeff', fullDoc], { type: 'application/msword' });
         const url = URL.createObjectURL(blob);
@@ -113,35 +157,31 @@ export function DocumentsPage() {
         try {
             let htmlBody = '';
             let css = '';
+            let isFullDocument = false;
+            let hasTemplate = false;
 
-            // Try to use the document's template for faithful reproduction
             if (doc.templateId) {
                 const tpl = await db.templates.get(doc.templateId);
                 if (tpl?.schema?.htmlContent) {
+                    hasTemplate = true;
                     let raw = tpl.schema.htmlContent as string;
-
-                    // Extract <style> blocks
-                    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-                    let styleMatch;
-                    while ((styleMatch = styleRegex.exec(raw)) !== null) {
-                        css += styleMatch[1] + '\n';
-                    }
-                    htmlBody = raw.replace(styleRegex, '');
-
-                    // Replace {{variable}} -> value
                     if (doc.metadata?.fields) {
-                        doc.metadata.fields.forEach((f: any) => {
-                            const escaped = f.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                            htmlBody = htmlBody.replace(new RegExp(`\\{\\{\\s*${escaped}\\s*\\}\\}`, 'gi'), f.value || '');
-                            const snake = f.label.toLowerCase().replace(/\s+/g, '_');
-                            htmlBody = htmlBody.replace(new RegExp(`\\{\\{\\s*${snake}\\s*\\}\\}`, 'gi'), f.value || '');
-                        });
-                        htmlBody = htmlBody.replace(/\{\{[^}]+\}\}/g, '___');
+                        raw = replaceTemplateVars(raw, doc.metadata.fields);
+                    }
+                    if (raw.includes('<html') || raw.includes('<!DOCTYPE') || raw.includes('<HTML')) {
+                        htmlBody = raw;
+                        isFullDocument = true;
+                    } else {
+                        const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+                        let styleMatch;
+                        while ((styleMatch = styleRegex.exec(raw)) !== null) {
+                            css += styleMatch[1] + '\n';
+                        }
+                        htmlBody = raw.replace(styleRegex, '');
                     }
                 }
             }
 
-            // Fallback: generate structured HTML from fields
             if (!htmlBody) {
                 htmlBody = `<div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto;">`;
                 htmlBody += `<h1 style="color: #1a1a1a; font-size: 20pt; margin-bottom: 8px; border-bottom: 2px solid #B8925C; padding-bottom: 8px;">${doc.name}</h1>`;
@@ -165,23 +205,71 @@ export function DocumentsPage() {
                 htmlBody += `<p style="color:#999; font-size:8pt; margin-top:24px; text-align:right;">Generado por DocIA</p></div>`;
             }
 
-            const printWindow = window.open('', '_blank');
-            if (printWindow) {
-                printWindow.document.write(`<!DOCTYPE html><html><head>
-                    <meta charset="utf-8"><title>${doc.name}</title>
+            // Build the full HTML page for the PDF
+            let pdfHTML: string;
+            if (isFullDocument) {
+                pdfHTML = htmlBody;
+            } else if (hasTemplate) {
+                pdfHTML = `<!DOCTYPE html><html><head><meta charset="utf-8">
+                    <style>${TEMPLATE_CSS_RESET} ${css}</style>
+                </head><body>${htmlBody}</body></html>`;
+            } else {
+                pdfHTML = `<!DOCTYPE html><html><head><meta charset="utf-8">
                     <style>
-                        @page { margin: 0.75in; size: letter; }
                         body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12pt; line-height: 1.5; color: #000; margin: 0; padding: 0; }
                         table { width: 100%; border-collapse: collapse; }
                         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
                         * { box-sizing: border-box; }
-                        img { max-width: 100%; }
                         ${css}
                     </style>
-                </head><body>${htmlBody}</body></html>`);
-                printWindow.document.close();
-                setTimeout(() => printWindow.print(), 500);
+                </head><body>${htmlBody}</body></html>`;
             }
+
+            // Create iframe for rendering (html2canvas needs visible elements)
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.left = '0';
+            iframe.style.top = '0';
+            iframe.style.width = '8.5in';
+            iframe.style.height = '11in';
+            iframe.style.opacity = '0';
+            iframe.style.pointerEvents = 'none';
+            iframe.style.zIndex = '-9999';
+            document.body.appendChild(iframe);
+
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                if (!iframeDoc) throw new Error('Could not access iframe document');
+                iframeDoc.open();
+                iframeDoc.write(pdfHTML);
+                iframeDoc.close();
+
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                const contentEl = iframeDoc.body;
+                if (!contentEl || !contentEl.innerHTML.trim()) throw new Error('No content to render');
+
+                const html2pdf = (await import('html2pdf.js')).default;
+                await html2pdf().set({
+                    margin: [0.5, 0.6, 0.5, 0.6],
+                    filename: `${doc.name}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, logging: false },
+                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                } as any).from(contentEl).save();
+            } catch (pdfErr) {
+                console.error('html2pdf failed, falling back to print:', pdfErr);
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                    printWindow.document.write(pdfHTML);
+                    printWindow.document.close();
+                    setTimeout(() => printWindow.print(), 500);
+                }
+            } finally {
+                document.body.removeChild(iframe);
+            }
+
             setDownloadMenuOpenId(null);
         } catch (e) {
             console.error("PDF Export Error:", e);
