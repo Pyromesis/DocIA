@@ -4,6 +4,7 @@ import { Settings2, Play, CheckCircle2, UploadCloud, Loader2, Copy, Download, Ro
 import { db } from '../../db/schema';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useDropzone } from 'react-dropzone';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   loadAISettings,
   scanDocument,
@@ -63,6 +64,7 @@ const VARIABLE_COLORS = [
 ];
 
 export function UploadScanPage() {
+  const { t } = useLanguage();
   // ─── State ───
   const [file, setFile] = useState<File | null>(null);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -856,10 +858,10 @@ export function UploadScanPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 shrink-0 mb-4">
         <div>
           <h1 className="text-xl md:text-2xl font-semibold text-gray-900 font-display">
-            Document Scanner
+            {t('upload.title')}
           </h1>
           <p className="text-gray-500 mt-0.5 text-xs md:text-sm">
-            Sube documentos para extracción inteligente con IA
+            {t('header.upload.subtitle')}
           </p>
         </div>
         {file && (
@@ -868,7 +870,7 @@ export function UploadScanPage() {
             className="flex items-center gap-2 px-4 py-2 text-sm text-stone-600 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
           >
             <RotateCcw size={16} />
-            Nuevo Escaneo
+            {t('upload.reset')}
           </button>
         )}
       </div>
@@ -879,7 +881,7 @@ export function UploadScanPage() {
         {/* LEFT PANEL: Document Preview / Upload */}
         <div className="min-h-[300px] md:min-h-0 md:flex-1 flex flex-col bg-gray-50 border border-gray-200 rounded-xl overflow-hidden shadow-inner relative min-w-0">
           <div className="bg-white/90 backdrop-blur-sm border-b border-gray-200 px-4 py-2.5 flex justify-between items-center shrink-0 z-10">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Documento Original</span>
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Document</span>
             {file && !result && (
               <span className="text-[10px] text-gray-400">{file.name} • {(file.size / 1024).toFixed(0)} KB</span>
             )}
@@ -913,9 +915,8 @@ export function UploadScanPage() {
                 >
                   <UploadCloud className="w-8 h-8 text-[#7C5C3F]" />
                 </motion.div>
-                <p className="text-gray-800 font-semibold text-base">Sube tu documento</p>
-                <p className="text-gray-400 text-xs mt-1">Arrastra y suelta PDF o Imagen</p>
-                <p className="text-gray-300 text-[10px] mt-3">PNG, JPG, WEBP, PDF</p>
+                <p className="text-gray-800 font-semibold text-base">{isDragActive ? t('upload.dropzoneActive') : t('upload.dropzone')}</p>
+                <p className="text-gray-300 text-[10px] mt-3">{t('upload.supported')}</p>
               </div>
             )}
           </div>
@@ -928,7 +929,7 @@ export function UploadScanPage() {
             <div className="flex flex-col h-full">
               <div className="bg-gray-50 border-b border-gray-200 px-5 py-3 flex items-center gap-2 text-[#7C5C3F] font-medium shrink-0">
                 <Settings2 size={18} />
-                <h3>Configuración</h3>
+                <h3>{t('upload.configuration')}</h3>
               </div>
 
               <div className="p-5 space-y-5 flex-1 overflow-y-auto">
@@ -955,9 +956,9 @@ export function UploadScanPage() {
                 {/* Project */}
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex justify-between">
-                    Proyecto
-                    <button onClick={handleCreateProject} className="text-[#B8925C] hover:text-[#917142] flex items-center gap-1" title="Nuevo Proyecto">
-                      <FolderPlus size={12} /> Nuevo
+                    {t('nav.projects')}
+                    <button onClick={handleCreateProject} className="text-[#B8925C] hover:text-[#917142] flex items-center gap-1" title={t('projects.create')}>
+                      <FolderPlus size={12} /> {t('common.create')}
                     </button>
                   </label>
                   <select
@@ -977,23 +978,20 @@ export function UploadScanPage() {
 
                 {/* Template */}
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Plantilla de Extracción</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('nav.templates')}</label>
                   <select
                     value={selectedTemplateId}
                     onChange={(e) => setSelectedTemplateId(e.target.value)}
                     disabled={isScanning}
                     className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-gray-700 focus:ring-2 focus:ring-[#B8925C]/20 outline-none transition-all hover:bg-white"
                   >
-                    <option value="none">✨ Auto-detectar todos los campos</option>
+                    <option value="none">✨ Auto</option>
                     {templates.map((t) => (
                       <option key={t.id} value={t.id}>
                         📄 {t.name}
                       </option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-gray-400">
-                    Selecciona una plantilla para extraer solo sus campos específicos
-                  </p>
                 </div>
 
                 {/* Template Variables Preview */}
@@ -1005,7 +1003,7 @@ export function UploadScanPage() {
                   >
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
                       <Palette size={12} />
-                      Variables de la Plantilla ({templateVars.length})
+                      {t('upload.templateVariables')} ({templateVars.length})
                     </label>
                     <div className="bg-gray-50 rounded-lg border border-gray-200 p-2 space-y-1 max-h-[180px] overflow-y-auto">
                       {templateVars.map((v, i) => {
@@ -1025,20 +1023,18 @@ export function UploadScanPage() {
                         );
                       })}
                     </div>
-                    <p className="text-[10px] text-gray-400 leading-relaxed">
-                      La IA extraerá <strong>únicamente</strong> estas {templateVars.length} variables
-                    </p>
+                    <p className="text-[10px] text-gray-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('upload.extractOnly').replace('{n}', `<strong>${templateVars.length}</strong>`) }} />
                   </motion.div>
                 )}
 
                 {/* AI Provider */}
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Proveedor IA</label>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('upload.provider')}</label>
                   <div className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-gray-700">
-                    Usa el proveedor configurado en <strong>Configuración → IA</strong>
+                    {t('upload.providerDesc')}
                   </div>
                   <p className="text-[10px] text-gray-400 mt-1">
-                    Visión: OpenAI, Gemini, Anthropic, OpenRouter, Mistral, Together, DeepSeek
+                    {t('upload.visionCapable')}
                   </p>
                 </div>
 
@@ -1057,7 +1053,7 @@ export function UploadScanPage() {
                     ) : (
                       <>
                         <Play size={18} />
-                        Iniciar Extracción
+                        {t('upload.startExtraction')}
                       </>
                     )}
                   </button>
@@ -1086,12 +1082,12 @@ export function UploadScanPage() {
                   {isRefining ? (
                     <div key="refining" className="flex items-center gap-2 text-[#B8925C]">
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <h3 className="font-semibold text-sm">Refinando extracción...</h3>
+                      <h3 className="font-semibold text-sm">{t('upload.refining')}</h3>
                     </div>
                   ) : (
                     <div key="complete" className="flex items-center gap-2 text-emerald-500">
                       <CheckCircle2 className="w-5 h-5" />
-                      <h3 className="font-semibold text-gray-800 text-sm">Extracción Completa</h3>
+                      <h3 className="font-semibold text-gray-800 text-sm">{t('upload.scanComplete')}</h3>
                     </div>
                   )}
                 </div>
@@ -1108,14 +1104,14 @@ export function UploadScanPage() {
               {/* Output Name & Export */}
               <div className="px-4 py-3 bg-gray-50/50 border-b border-gray-100 space-y-2 shrink-0">
                 <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1">
-                  <Download size={10} /> Guardar Documento Como...
+                  <Download size={10} /> {t('upload.saveAs')}
                 </label>
                 <input
                   type="text"
                   value={outputName}
                   onChange={(e) => setOutputName(e.target.value)}
                   className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#B8925C]/20 focus:border-[#B8925C]/40 transition-all bg-white"
-                  placeholder="Nombre del archivo..."
+                  placeholder={t('upload.saveAsPlaceholder')}
                 />
                 <div className="flex gap-2">
                   <button
@@ -1143,7 +1139,7 @@ export function UploadScanPage() {
                 <div className="p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-                      Campos Extraídos ({result.fields.length})
+                      {t('upload.extractedFields')} ({result.fields.length})
                     </p>
                   </div>
 
@@ -1185,7 +1181,7 @@ export function UploadScanPage() {
                               <button
                                 onClick={() => setTrainingSelection(prev => ({ ...prev, [field.label]: !prev[field.label] }))}
                                 className={`transition-colors ${trainingSelection[field.label] ? 'text-emerald-500 hover:text-emerald-600' : 'text-gray-300 hover:text-gray-400'}`}
-                                title={trainingSelection[field.label] ? "Se usará para entrenar" : "No se usará para entrenar"}
+                                title={trainingSelection[field.label] ? t('upload.willTrain') : t('upload.wontTrain')}
                               >
                                 {trainingSelection[field.label] ? <CheckSquare size={14} /> : <Square size={14} />}
                               </button>
@@ -1210,7 +1206,7 @@ export function UploadScanPage() {
                               userEditedFields.current.add(field.label);
                             }}
                             className="w-full text-sm font-medium text-gray-900 bg-transparent border-0 border-b border-dashed border-gray-200 hover:border-gray-300 focus:border-[#B8925C] focus:ring-0 px-0 py-1 transition-all resize-none"
-                            placeholder="(Vacío)"
+                            placeholder={t('upload.empty')}
                             style={{ minHeight: '28px', lineHeight: '1.4' }}
                           />
                         </div>
@@ -1227,11 +1223,9 @@ export function UploadScanPage() {
                       className="w-full py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
                     >
                       {isTraining ? <Loader2 size={14} className="animate-spin" /> : <Brain size={14} />}
-                      Confirmar y Entrenar IA
+                      {t('upload.trainBtn')}
                     </button>
-                    <p className="text-[9px] text-gray-400 mt-1.5 text-center px-4 leading-relaxed">
-                      Al confirmar, la IA aprenderá las <strong className="text-gray-500">ubicaciones</strong> de los campos marcados para mejorar futuras extracciones en documentos similares.
-                    </p>
+                    <p className="text-[9px] text-gray-400 mt-1.5 text-center px-4 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('upload.trainDesc') }} />
                   </div>
                 </div>
               </div>
@@ -1241,7 +1235,7 @@ export function UploadScanPage() {
                 <div className="border-t border-gray-100 p-3 shrink-0">
                   <details className="group">
                     <summary className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-600 transition-colors">
-                      Texto Crudo Extraído
+                      {t('upload.rawText')}
                     </summary>
                     <pre className="mt-2 text-[10px] text-gray-600 bg-gray-50 p-2 rounded-lg overflow-x-auto whitespace-pre-wrap max-h-[150px] overflow-y-auto border border-gray-100">
                       {result.rawText}
@@ -1262,7 +1256,7 @@ export function UploadScanPage() {
           >
             <div className="bg-gray-50 border-b border-gray-200 px-3 py-2.5 flex items-center justify-between shrink-0">
               <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
-                <Palette size={12} /> Mapa de Colores
+                <Palette size={12} /> {t('upload.colorMap')}
               </span>
               <button
                 onClick={() => setShowVariablePanel(!showVariablePanel)}
@@ -1274,7 +1268,7 @@ export function UploadScanPage() {
             {showVariablePanel && (
               <div className="flex-1 p-2 space-y-1 overflow-y-auto">
                 <p className="text-[9px] text-gray-400 px-1 mb-2 leading-relaxed">
-                  Selecciona una variable, luego marca el área en el documento con el resaltador
+                  {t('upload.colorMapDesc')}
                 </p>
                 {templateVars.map((v, i) => {
                   const color = VARIABLE_COLORS[i % VARIABLE_COLORS.length];
@@ -1310,16 +1304,16 @@ export function UploadScanPage() {
                     className="mt-3 p-2 bg-amber-50 rounded-lg border border-amber-200"
                   >
                     <p className="text-[9px] text-amber-700 font-medium">
-                      ✏️ Activo: <strong>{activeColorVariable}</strong>
+                      ✏️ {t('upload.active')} <strong>{activeColorVariable}</strong>
                     </p>
                     <p className="text-[9px] text-amber-600 mt-0.5">
-                      Usa el resaltador en el documento para marcar esta variable
+                      {t('upload.activeDesc')}
                     </p>
                     <button
                       onClick={() => setActiveColorVariable(null)}
                       className="mt-1.5 text-[9px] text-amber-600 hover:text-amber-800 underline"
                     >
-                      Deseleccionar
+                      {t('upload.deselect')}
                     </button>
                   </motion.div>
                 )}
@@ -1338,7 +1332,7 @@ export function UploadScanPage() {
             exit={{ opacity: 0 }}
             className="mt-3 bg-rose-50 border border-rose-200 rounded-xl p-4 text-sm text-rose-700"
           >
-            <p className="font-medium mb-1">⚠️ Error de Escaneo</p>
+            <p className="font-medium mb-1">⚠️ {t('upload.scanError')}</p>
             <p className="text-xs">{error}</p>
           </motion.div>
         )}

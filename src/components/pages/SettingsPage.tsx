@@ -96,45 +96,17 @@ const SettingsPage: React.FC = () => {
     });
   };
 
-  return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
-      {/* Header */}
-      <header className="space-y-2">
-        <h1 className="text-3xl font-light text-gray-900 tracking-tight flex items-center gap-3">
-          <Settings className="w-8 h-8 text-[#B8925C]" />
-          System Settings
-        </h1>
-        <p className="text-gray-500 max-w-2xl">
-          Configure your AI processing engine. Choose between cloud-based power or complete local privacy.
-        </p>
-      </header>
-
-      {/* Tabs */}
-      <div className="flex space-x-1 bg-gray-100/50 p-1 rounded-xl w-fit">
-        {['ai', 'general', 'about'].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab as any)}
-            className={`px-6 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeTab === tab
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            {tab === 'ai' && ' Connectivity'}
-          </button>
-        ))}
-      </div>
-
-      <AnimatePresence mode="wait">
-        {activeTab === 'ai' && (
+  const renderActiveTab = () => {
+    switch (activeTab) {
+      case 'ai':
+        return (
           <motion.div
+            key="ai-tab"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             className="space-y-8"
           >
-
             {/* AI Mode Switcher */}
             <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-50">
@@ -540,10 +512,11 @@ const SettingsPage: React.FC = () => {
               </div>
             </section>
           </motion.div>
-        )}
-
-        {activeTab === 'general' && (
+        );
+      case 'general':
+        return (
           <motion.div
+            key="general-tab"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6"
@@ -574,10 +547,11 @@ const SettingsPage: React.FC = () => {
               </div>
             </div>
           </motion.div>
-        )}
-
-        {activeTab === 'about' && (
+        );
+      case 'about':
+        return (
           <motion.div
+            key="about-tab"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6 max-w-2xl"
@@ -616,9 +590,46 @@ const SettingsPage: React.FC = () => {
               </div>
             </div>
           </motion.div>
-        )}
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
+      {/* Header */}
+      <header className="space-y-2">
+        <h1 className="text-3xl font-light text-gray-900 tracking-tight flex items-center gap-3">
+          <Settings className="w-8 h-8 text-[#B8925C]" />
+          System Settings
+        </h1>
+        <p className="text-gray-500 max-w-2xl">
+          Configure your AI processing engine. Choose between cloud-based power or complete local privacy.
+        </p>
+      </header>
+
+      {/* Tabs */}
+      <div className="flex space-x-1 bg-gray-100/50 p-1 rounded-xl w-fit">
+        {['ai', 'general', 'about'].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab as any)}
+            className={`px-6 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeTab === tab
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'ai' && ' Connectivity'}
+          </button>
+        ))}
+      </div>
+
+      <AnimatePresence mode="wait">
+        {renderActiveTab()}
       </AnimatePresence>
-    </div >
+    </div>
   );
 };
 

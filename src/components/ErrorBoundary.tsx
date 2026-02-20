@@ -55,10 +55,10 @@ export class ErrorBoundary extends Component<Props, State> {
                     }}>
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
                         <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '8px', color: '#991B1B' }}>
-                            Algo salió mal
+                            Something went wrong
                         </h2>
                         <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '20px', lineHeight: 1.5 }}>
-                            Ocurrió un error inesperado. Puedes intentar recargar esta sección o volver a la página principal.
+                            An unexpected error occurred. You can try reloading this section or returning to the main page.
                         </p>
                         {this.state.error && (
                             <details style={{
@@ -70,7 +70,7 @@ export class ErrorBoundary extends Component<Props, State> {
                                 padding: '12px',
                                 borderRadius: '8px',
                             }}>
-                                <summary style={{ cursor: 'pointer', marginBottom: '8px' }}>Detalles técnicos</summary>
+                                <summary style={{ cursor: 'pointer', marginBottom: '8px' }}>Technical details</summary>
                                 <code style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                                     {this.state.error.message}
                                 </code>
@@ -92,7 +92,7 @@ export class ErrorBoundary extends Component<Props, State> {
                             onMouseOver={(e) => (e.currentTarget.style.background = '#a07d4d')}
                             onMouseOut={(e) => (e.currentTarget.style.background = '#B8925C')}
                         >
-                            Reintentar
+                            Retry
                         </button>
                     </div>
                 </div>

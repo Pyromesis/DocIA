@@ -726,7 +726,7 @@ If you recognize similarities with previously trained documents, proactively men
                         <div className="bg-white/80 backdrop-blur-sm p-4 rounded-xl border border-gray-100 shadow-sm max-w-2xl mx-auto mb-6 hover:shadow-md transition-shadow">
                             <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                                 <Sparkles size={14} className="text-[#B8925C]" />
-                                Refinar Plantilla Existente (Opcional)
+                                {t('training.refineExisting')}
                             </h3>
                             <select
                                 value={selectedTemplateId}
@@ -734,14 +734,14 @@ If you recognize similarities with previously trained documents, proactively men
                                 onChange={e => setSelectedTemplateId(e.target.value)}
                                 className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-700 outline-none focus:ring-2 focus:ring-[#B8925C]/20 cursor-pointer"
                             >
-                                <option value="none">Crear Nueva Plantilla desde Cero</option>
+                                <option value="none">{t('training.createNew')}</option>
                                 {templates.map(t => (
                                     <option key={t.id} value={t.id}>{t.name} ({(t.schema?.fields as any[])?.length || 0} fields)</option>
                                 ))}
                             </select>
                             {selectedTemplateId !== 'none' && (
                                 <p className="text-[10px] text-gray-500 mt-2 px-1">
-                                    Sube ejemplos de este tipo de documento para entrenar a la IA en los campos específicos.
+                                    {t('training.refineHint')}
                                 </p>
                             )}
                         </div>
