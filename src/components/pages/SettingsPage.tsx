@@ -16,7 +16,6 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/schema';
 import {
   PROVIDERS,
@@ -35,22 +34,17 @@ const SettingsPage: React.FC = () => {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
 
-  // Fetch settings from DB
-  const preferences = useLiveQuery(() => db.preferences.toArray());
-
   // Local state for form handling before save
   const [localSettings, setLocalSettings] = useState<AISettings>(DEFAULT_SETTINGS);
 
-  // Load from DB when ready (with auto-migration of broken model IDs)
+  // Load from DB when ready
   useEffect(() => {
-    if (preferences) {
-      loadAISettings().then(settings => setLocalSettings(settings));
-    }
-  }, [preferences]);
+    loadAISettings().then(settings => setLocalSettings(settings));
+  }, []);
 
   const handleSave = async () => {
     try {
-      const aiPref = preferences?.find(p => p.key === 'ai_settings');
+      const aiPref = await db.preferences.where("key").equals("ai_settings").first();
       if (aiPref?.id) {
         await db.preferences.update(aiPref.id, { value: localSettings as any });
       } else {
