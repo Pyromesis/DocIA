@@ -440,7 +440,7 @@ export async function generateFaithfulTemplate(
 
     // Step 1: Build HTML skeleton from text positions (deterministic, no AI needed)
     const htmlSkeleton = buildHTMLSkeleton(textLayers, scanResult.fields);
-    console.log('📐 HTML skeleton built from text positions (' + textLayers.reduce((s, p) => s + p.items.length, 0) + ' text items)');
+    // console.log('📐 HTML skeleton built from text positions (' + textLayers.reduce((s, p) => s + p.items.length, 0) + ' text items)');
 
     // Step 2: Try AI refinement (optional — skeleton is usable without it)
     let html = htmlSkeleton;
@@ -450,7 +450,7 @@ export async function generateFaithfulTemplate(
         const supportsVision = ['openai', 'gemini', 'anthropic', 'openrouter', 'mistral', 'together', 'deepseek'].includes(provider);
 
         if (supportsVision) {
-            console.log(`🧠 Refining template with AI (${provider})...`);
+            // console.log(`🧠 Refining template with AI (${provider})...`);
 
             // Retrieve learnings
             const memoryContext = await buildMemoryPrompt();
@@ -482,12 +482,12 @@ export async function generateFaithfulTemplate(
             }
 
             // Validate — the refined version should still have variables
-            const hasVariables = /\{\{[^}]+\}\}/.test(refined);
+            // const hasVariables = /\{\{[^}]+\}\}/.test(refined);
             const hasDiv = refined.startsWith('<div');
 
             if (hasDiv) {
                 html = refined;
-                console.log('✨ AI refinement applied variables:', hasVariables);
+                // console.log('✨ AI refinement applied variables:', hasVariables);
             } else {
                 console.warn('⚠️ AI refinement rejected (invalid structure), using skeleton');
             }

@@ -119,7 +119,7 @@ export async function saveMemoriesFromScan(params: {
             templateId: params.templateId,
             structure: params.fields.map(f => ({
                 label: f.label,
-                sampleValue: f.value.slice(0, 100),
+                // Security Fix: Removed sampleValue to prevent PII leakage
                 confidence: f.confidence,
             })),
             locations: params.fieldLocations, // Persist spatial cues
@@ -138,7 +138,7 @@ export async function saveMemoriesFromScan(params: {
             title: `${group} fields`,
             content: JSON.stringify(fields.map(f => ({
                 label: f.label,
-                sampleValue: f.value.slice(0, 80),
+                // Security Fix: Removed sampleValue to prevent PII leakage
             }))),
             tags: fields.map(f => f.label.toLowerCase()),
             sourceDocumentName: params.documentName,

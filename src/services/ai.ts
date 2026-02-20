@@ -904,7 +904,7 @@ export async function scanDocument(
                 return idxA - idxB;
             });
 
-            console.log(`🔒 Strict mode: ${result.fields.length} → ${filteredFields.length} fields (template has ${targetVariables.length})`);
+            // console.log(`🔒 Strict mode: ${result.fields.length} → ${filteredFields.length} fields (template has ${targetVariables.length})`);
             return { ...result, fields: filteredFields };
         }
         return result;

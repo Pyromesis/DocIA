@@ -134,8 +134,8 @@ export function UploadScanPage() {
       let updatedCount = 0;
       const updatedLabels = new Set<string>();
 
-      console.log('🧠 Smart Refinement Started with hints:', hints);
-      console.log('🖼️ Image Source:', imageSrc ? 'Present' : 'Missing');
+      // console.log('🧠 Smart Refinement Started with hints:', hints);
+      // console.log('🖼️ Image Source:', imageSrc ? 'Present' : 'Missing');
 
       // Process each hint in parallel
       await Promise.all(hints.map(async (ann) => {
@@ -143,7 +143,7 @@ export function UploadScanPage() {
 
         // SKIP fields that the user has manually edited — respect user corrections
         if (userEditedFields.current.has(ann.label)) {
-          console.log(`⏭️ Skipping AI refinement for user-edited field: ${ann.label}`);
+          // console.log(`⏭️ Skipping AI refinement for user-edited field: ${ann.label}`);
           return;
         }
 
@@ -184,7 +184,7 @@ export function UploadScanPage() {
 
         // 3. Scan ONLY this snippet with an enhanced focused prompt
         setLoadingField(ann.label); // ⏳ PRO FEEDBACK
-        console.log(`✂️ Scanning crop for variable: ${ann.label}`);
+        // console.log(`✂️ Scanning crop for variable: ${ann.label}`);
         const cropResult = await scanDocument(
           cropBase64,
           'image/jpeg',
@@ -214,7 +214,7 @@ export function UploadScanPage() {
       }));
 
       if (updatedCount > 0) {
-        console.log(`🧠 Smart Refine: Updated ${updatedCount} fields via cropping`);
+        // console.log(`🧠 Smart Refine: Updated ${updatedCount} fields via cropping`);
         setResult({ ...result, fields: newFields });
         setRecentlyUpdatedFields(updatedLabels);
         // Clear highlight after 3 seconds
@@ -340,7 +340,7 @@ export function UploadScanPage() {
           },
           updatedAt: Date.now(),
         });
-        console.log('📝 Auto-saved edited fields to document', savedDocumentId);
+        // console.log('📝 Auto-saved edited fields to document', savedDocumentId);
       } catch (e) {
         console.error('Auto-save failed:', e);
       }
@@ -407,7 +407,7 @@ export function UploadScanPage() {
           },
           updatedAt: Date.now(),
         });
-        console.log('✅ Document updated in DB with edited fields');
+        // console.log('✅ Document updated in DB with edited fields');
       }
 
       const btn = document.getElementById('train-btn');
@@ -498,14 +498,14 @@ export function UploadScanPage() {
         selectedTemplateId !== 'none' ? Number(selectedTemplateId) : undefined
       );
 
-      console.log('🧠 Memory Matches found:', matches);
+      // console.log('🧠 Memory Matches found:', matches);
 
       const bestPattern = matches.find(m => m.entry.type === 'document_pattern');
 
       let learningCues: { variable: string; x: number; y: number; w: number; h: number }[] = [];
       if (bestPattern) {
         try {
-          console.log('🧠 Loading cues from pattern:', bestPattern.entry.title);
+          // console.log('🧠 Loading cues from pattern:', bestPattern.entry.title);
           const data = JSON.parse(bestPattern.entry.content);
           if (data.locations) {
             // Convert location map to array
@@ -513,7 +513,7 @@ export function UploadScanPage() {
               variable: lbl,
               x: loc.x, y: loc.y, w: loc.w, h: loc.h
             }));
-            console.log('Using spatial learning cues:', learningCues);
+            // console.log('Using spatial learning cues:', learningCues);
           }
         } catch (e) { console.error('Error parsing spatial cues', e); }
       }

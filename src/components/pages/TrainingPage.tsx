@@ -316,7 +316,7 @@ export function TrainingPage() {
 
                     // Store the faithful HTML in the result
                     result.htmlStructure = faithfulResult.html;
-                    console.log('✅ Faithful template generated:', faithfulResult.variables.length, 'variables,', faithfulResult.pageCount, 'pages');
+                    // console.log('✅ Faithful template generated:', faithfulResult.variables.length, 'variables,', faithfulResult.pageCount, 'pages');
                 } catch (faithfulErr: any) {
                     console.warn('⚠️ Faithful template generation failed, continuing without:', faithfulErr.message);
                     // Non-fatal — the scan result is still usable
@@ -490,7 +490,7 @@ If you recognize similarities with previously trained documents, proactively men
 
             // 🧠 Learn Patterns: Save structural memories
             if (extractedData) {
-                console.log('🧠 Saving document pattern to AI Memory...');
+                // console.log('🧠 Saving document pattern to AI Memory...');
                 await saveMemoriesFromScan({
                     documentName: file?.name || 'Unknown',
                     documentType: 'unknown',
@@ -541,7 +541,7 @@ If you recognize similarities with previously trained documents, proactively men
                         updatedAt: now,
                     });
 
-                    console.log('✅ Template created with ID:', templateId, 'Name:', templateName);
+                    // console.log('✅ Template created with ID:', templateId, 'Name:', templateName);
 
                     await db.activityLogs.add({
                         action: 'template_create',
