@@ -415,19 +415,19 @@ Please apply all instructions and return the clean HTML.`,
           <button
             onClick={() => editorRef.current?.insertInstruction()}
             className="p-1.5 rounded hover:bg-yellow-100 text-yellow-600 transition-colors flex items-center gap-1.5"
-            title="Selecciona texto → haz clic aquí → escribe instrucciones para la IA sobre cómo modificar esa parte"
+            title="Select text → click here → write instructions for the AI on how to modify that part"
           >
             <Highlighter size={16} />
-            <span className="text-xs font-medium">Marcar IA</span>
+            <span className="text-xs font-medium">Mark AI</span>
           </button>
           {/* Tooltip on hover */}
           <div className="absolute hidden group-hover:block top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl z-50 pointer-events-none">
-            <p className="font-semibold mb-1">📝 Instrucciones para la IA</p>
+            <p className="font-semibold mb-1">📝 AI Instructions</p>
             <ol className="space-y-1 list-decimal list-inside text-gray-300">
-              <li>Selecciona el texto que quieres cambiar</li>
-              <li>Haz clic en este botón</li>
-              <li>Escribe qué debe hacer la IA con esa parte</li>
-              <li>Usa "Improve with AI" para aplicar los cambios</li>
+              <li>Select the text you want to change</li>
+              <li>Click this button</li>
+              <li>Write what the AI should do with that part</li>
+              <li>Use "Improve with AI" to apply the changes</li>
             </ol>
             <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
           </div>
