@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Save, Download, Printer, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, Undo, Redo, Sparkles, Loader2, Highlighter } from 'lucide-react';
+import { ArrowLeft, Save, Download, Printer, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, List, Undo, Redo, Sparkles, Loader2, Highlighter, ChevronDown, FileText, FileType, Code } from 'lucide-react';
 import type { FormalTemplate } from '../../data/formalTemplates';
 import { db } from '../../db/schema';
 import { loadAISettings, callChat } from '../../services/ai';
@@ -18,6 +18,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onBack
   const [activeFormats, setActiveFormats] = useState<Set<string>>(new Set());
   const [isAIThinking, setIsAIThinking] = useState(false);
   const [showAIPrompt, setShowAIPrompt] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [aiInstruction, setAiInstruction] = useState('');
   const [hasPendingInstructions, setHasPendingInstructions] = useState(false);
   const [extractedVariables, setExtractedVariables] = useState<string[]>([]);
@@ -261,6 +262,50 @@ Please apply all instructions and return the clean HTML.`,
     a.download = `${template.name.replace(/\s+/g, '_')}.html`;
     a.click();
     URL.revokeObjectURL(url);
+    setShowDownloadMenu(false);
+  };
+
+  const handleDownloadWord = () => {
+    const htmlExport = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><title>${template.name}</title></head>
+<body style="font-family: 'Times New Roman', serif; font-size: 14px; line-height: 1.8; color: #000; padding: 40px; max-width: 800px; margin: 0 auto;">${content}</body></html>`;
+    const blob = new Blob(['\ufeff', htmlExport], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${template.name.replace(/\s+/g, '_')}.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowDownloadMenu(false);
+  };
+
+  const handleDownloadPDF = async () => {
+    // Dynamic import of html2pdf safely
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
+      const element = document.createElement('div');
+      element.innerHTML = content;
+      element.style.padding = '0.7in';
+      element.style.fontFamily = "'Times New Roman', serif";
+      element.style.fontSize = "14px";
+      element.style.lineHeight = "1.8";
+      element.style.color = "#000";
+
+      const opt = {
+        margin: 0,
+        filename: `${template.name.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'in' as const, format: 'letter' as const, orientation: 'portrait' as const }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      // Fallback
+      handlePrint();
+    }
+    setShowDownloadMenu(false);
   };
 
   const toolbarBtn = (command: string, icon: React.ReactNode, title: string) => {
@@ -358,10 +403,66 @@ Please apply all instructions and return the clean HTML.`,
 
           <div className="w-px h-6 bg-gray-200 mx-1"></div>
 
-          <button onClick={handleDownloadHTML} className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Download HTML">
-            <Download className="w-3.5 h-3.5" />
-            Download
-          </button>
+          {/* Download Dropdown Selection */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Download Options"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download
+              <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showDownloadMenu ? 'rotate-180' : ''}`} />
+            </button>
+
+            <AnimatePresence>
+              {showDownloadMenu && (
+                <>
+                  <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowDownloadMenu(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden outline-none font-sans"
+                  >
+                    <div className="p-1">
+                      <button
+                        onClick={handleDownloadPDF}
+                        className="w-full text-left flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <FileText className="w-4 h-4 text-red-500" />
+                        <div>
+                          <div className="font-semibold text-gray-800">PDF Document</div>
+                          <div className="font-normal text-[10px] text-gray-500">Perfect for sharing</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={handleDownloadWord}
+                        className="w-full text-left flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <FileType className="w-4 h-4 text-blue-500" />
+                        <div>
+                          <div className="font-semibold text-gray-800">Word (.doc)</div>
+                          <div className="font-normal text-[10px] text-gray-500">Editable in MsWord</div>
+                        </div>
+                      </button>
+
+                      <div className="h-px bg-gray-100 my-1"></div>
+
+                      <button
+                        onClick={handleDownloadHTML}
+                        className="w-full text-left flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                      >
+                        <Code className="w-3.5 h-3.5 text-gray-400" />
+                        Raw HTML
+                      </button>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
           <button onClick={handlePrint} className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" title="Print / Export PDF">
             <Printer className="w-3.5 h-3.5" />
             Print / PDF

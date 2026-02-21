@@ -95,7 +95,7 @@ export const PROVIDER_MODELS: Record<CloudProvider, ModelOption[]> = {
     ],
     groq: [
         { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B (Fast)", free: true, recommended: true },
-        { id: "llama-3.2-11b-vision-preview", name: "Llama 3.2 11B Vision (Free)", free: true, vision: true, recommended: true },
+        { id: "meta-llama/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B Vision", free: true, vision: true, recommended: true },
         { id: "deepseek-r1-distill-llama-70b", name: "DeepSeek R1 Distill (Reasoning)", free: true },
         { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B" },
     ],
@@ -188,11 +188,11 @@ export const PROVIDERS: ProviderMeta[] = [
     {
         id: "groq",
         name: "Groq",
-        description: "Llama 3.2 11B Vision & DeepSeek R1 — Fastest Inference",
+        description: "Llama 3.3 70B & Llama 4 Scout Vision",
         keyUrl: "https://console.groq.com/keys",
         keyHint: "gsk_...",
         chatModel: "llama-3.3-70b-versatile",
-        visionModel: "llama-3.2-11b-vision-preview",
+        visionModel: "meta-llama/llama-4-scout-17b-16e-instruct",
         supportsVision: true,
         color: "#f55036",
     },
@@ -334,13 +334,15 @@ function migrateModelIds(settings: AISettings): boolean {
 
     let changed = false;
 
-    if (settings.provider === "openrouter" && settings.customModels?.openrouter) {
-        const models = settings.customModels.openrouter;
-        for (const field of ["chatModel", "visionModel"] as const) {
-            const current = models[field];
-            if (current && DEPRECATED_MODELS[current]) {
-                models[field] = DEPRECATED_MODELS[current];
-                changed = true;
+    for (const providerKey of Object.keys(settings.customModels || {})) {
+        const models = settings.customModels![providerKey as CloudProvider];
+        if (models) {
+            for (const field of ["chatModel", "visionModel"] as const) {
+                const current = models[field];
+                if (current && DEPRECATED_MODELS[current]) {
+                    models[field] = DEPRECATED_MODELS[current];
+                    changed = true;
+                }
             }
         }
     }
